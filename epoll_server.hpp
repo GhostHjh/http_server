@@ -1,3 +1,5 @@
+#ifndef _epoll_server_
+#define _epoll_server_
 #include <iostream>
 #include <string>
 #include <sys/epoll.h>
@@ -7,6 +9,8 @@
 #include <unistd.h>
 #include <fcntl.h>
 
+#include "http_header.hpp"
+
 class epoll_server
 {
 public:
@@ -15,7 +19,6 @@ public:
     ~epoll_server();
 
     bool fd_fcntl(int fd);
-    char* header_select_path(char* client_header);
 
     //void start_epoll_ET();
     //void start_epoll_LT();
@@ -23,7 +26,7 @@ public:
     bool epoll_EPOLLIN_ADD_events_ET(int server_socket);
     bool epoll_EPOLLERR_EPOLLHUP_DEL_events(int client_socket);
     bool epoll_EPOLLIN_read_client(int client_socket);
-    bool epoll_EPOLLIN_read_write_client(int client_socket, char* write_str);
+    bool epoll_EPOLLIN_read_write_client(int client_socket);
     void epoll_events_if(epoll_event &ep_ev);
 
     void start_epoll_ET();
@@ -36,7 +39,7 @@ private:
     uint16_t PROT;
     socklen_t server_sockaddr_len;
     int server_epoll;
-    epoll_event server_epoll_ev[1024]; 
+    epoll_event server_epoll_ev[1024];
 };
 
 epoll_server::epoll_server()
@@ -99,7 +102,6 @@ bool epoll_server::fd_fcntl(int fd)
 
     return true;
 }
-
 
 /*void epoll_server::start_epoll_ET()
 {
@@ -223,7 +225,7 @@ bool epoll_server::epoll_EPOLLIN_read_client(int client_socket)
     }
     else if (tmp_ctr_size != 0)
     {
-        printf("客戶端标识\t%d\n发送数据: %s", client_socket, tmp_ctr);
+        printf("客戶端标识\t%d\n发送数据:\n%s", client_socket, tmp_ctr);
         while(tmp_ctr_size == 3072)
         {
             tmp_ctr_size = read(client_socket, tmp_ctr, 3072);
@@ -234,7 +236,7 @@ bool epoll_server::epoll_EPOLLIN_read_client(int client_socket)
     }   
 }
 
-bool epoll_server::epoll_EPOLLIN_read_write_client(int client_socket, char* write_str)
+bool epoll_server::epoll_EPOLLIN_read_write_client(int client_socket)
 {
     char tmp_ctr[3072] = {0};
     size_t tmp_ctr_size = read(client_socket, tmp_ctr, 3072);
@@ -245,20 +247,37 @@ bool epoll_server::epoll_EPOLLIN_read_write_client(int client_socket, char* writ
     }
     else if (tmp_ctr_size != 0)
     {
-        printf("客戶端标识\t%d\n发送数据: %s", client_socket, tmp_ctr);
+        //printf("客戶端标识\t%d\n发送数据:\n%s", client_socket, tmp_ctr);
         while(tmp_ctr_size == 3072)
         {
             tmp_ctr_size = read(client_socket, tmp_ctr, 3072);
-            printf(tmp_ctr);
+            //printf(tmp_ctr);
         }
-        printf("\n\n");
-        return true;
+
+        //printf("\n\n");
+        //char* tmp_write_1 = new char[81];
+        //strcpy(tmp_write_1, "HTTP/1.1 200\nserver:simple web server\nConten-length:2048\nContent-type:text/html\n");
+        //write(client_socket, tmp_write_1, 81);
+        //cout << tmp_write_1 << endl;
+        //char* tmp_write_2 = new char[122];
+        //strcpy(tmp_write_2, "<!DOCTYPE html>\n<html>\n<head>\n<meta charset=\"utf-8\">\n<title>test</title>\n</head>\n<body>\n    Hello World.\n</body>\n</html>\n");
+        //write(client_socket, tmp_write_2, 122);
+        //cout << tmp_write_2 << endl;
+        //delete[](tmp_write_1);
+        //delete[](tmp_write_2);
+
+        http_header* header = new http_header(tmp_ctr);
+        write(client_socket, header->get_http_server_header().c_str(), *header->get_http_server_header_size());
+        write(client_socket, header->get_http_request_path_file(), *header->get_http_request_path_file_size());
+        delete(header);
+
+        return epoll_EPOLLERR_EPOLLHUP_DEL_events(client_socket);
     }   
 }
 
 void epoll_server::epoll_events_if(epoll_event &ep_ev)
 {
-    std::cout << ep_ev.data.fd << "   " << ep_ev.events << std::endl;
+    //std::cout << ep_ev.data.fd << "   " << ep_ev.events << std::endl;
     if (ep_ev.data.fd == server_socket && ep_ev.events & EPOLLIN)
     {
         //int tmp_ =  server_epoll_ev[i].data.fd;
@@ -268,7 +287,7 @@ void epoll_server::epoll_events_if(epoll_event &ep_ev)
     else
     {
         //int tmp_ =  server_epoll_ev[i].data.fd;
-        if (epoll_EPOLLIN_read_client(ep_ev.data.fd) == false)
+        if (epoll_EPOLLIN_read_write_client(ep_ev.data.fd) == false)
             exit(0);
     }
 }
@@ -287,3 +306,4 @@ void epoll_server::start_epoll_ET()
 }
 
 
+#endif _epoll_server_
