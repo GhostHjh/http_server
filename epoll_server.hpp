@@ -76,8 +76,6 @@ epoll_server::epoll_server(char* ip, uint16_t prot)
 
     //设置epoll触发事件
     epoll_ctl(server_epoll, EPOLL_CTL_ADD, server_socket, &tmp_server_epoll_ev);
-
-    
 }
 
 epoll_server::~epoll_server()
@@ -266,9 +264,9 @@ bool epoll_server::epoll_EPOLLIN_read_write_client(int client_socket)
         //delete[](tmp_write_1);
         //delete[](tmp_write_2);
 
-        http_header* header = new http_header(tmp_ctr);
-        write(client_socket, header->get_http_server_header().c_str(), *header->get_http_server_header_size());
-        write(client_socket, header->get_http_request_path_file(), *header->get_http_request_path_file_size());
+        http_header* header = new http_header(tmp_ctr, tmp_ctr_size);
+        write(client_socket, header->get_http_server_header(), header->get_http_server_header_size());
+        write(client_socket, header->get_http_request_path_file(), header->get_http_request_path_file_size());
         delete(header);
 
         return epoll_EPOLLERR_EPOLLHUP_DEL_events(client_socket);
