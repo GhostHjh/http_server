@@ -1,18 +1,23 @@
 #include <iostream>
 #include <string>
 #include "epoll_server.hpp"
-#include "http_header.hpp"
+//#include "http_header.hpp"
+#include "include/sql_pool.hpp"
+#include "unistd.h"
 
 
 int main(int argc, char** argv)
 {
-    epoll_server tmp_epoll("192.168.37.128", 8090);
+    epoll_server tmp_epoll("192.168.37.128", 8091);
     tmp_epoll.start_epoll_ET();
-    
-    //char* tmp_str = new char[644];
-    //stpcpy(tmp_str, "GET /xx.txt HTTP/1.1\nHost: 127.0.0.1:6061\nConnection: keep-alive\nsec-ch-ua: \".Not/A)Brand\";v=\"99\", \"Google Chrome\";v=\"103\", \"Chromium\";v=\"103\"\nsec-ch-ua-mobile: ?0\nsec-ch-ua-platform: \"Linux\"\nDNT: 1\nUpgrade-Insecure-Requests: 1\nUser-Agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/103.0.0.0 Safari/537.36\nAccept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9\nSec-Fetch-Site: none\nSec-Fetch-Mode: navigate\nSec-Fetch-User: ?1\nSec-Fetch-Dest: document\nAccept-Encoding: gzip, deflate, br\nAccept-Language: zh-CN,zh;q=0.9");
-    //http_header* cs = new http_header(tmp_str);
-    //cout << cs->get_http_request_path_file();
-    
+    //sql_pool cs("./cs.db", 1);
+    //string* SQL_void = new string("INSERT INTO table_1 (name, old) VALUES ('ys', 550);");
+    //cs.sql_run_SQL((void*)SQL_void);
+    //for(int i = 0; i < 500; ++i)
+    //    cs.run_sql_add("INSERT INTO table_1 (name, old) VALUES ('ys', 553);");
+ 
+    //getchar();
+    //sleep(2);
+
     return 0;
 }
