@@ -2,15 +2,21 @@
 #define _epoll_server_
 #include <iostream>
 #include <string>
+#include <map>
 #include <sys/epoll.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <pthread.h>
 
 #include "http_header.hpp"
+#include "sql_pool.hpp"
 //#include "pthread_pool.hpp"
+
+using std::map;
+const char* SQL_insert_str(string&, sockaddr_in&, const char*);
 
 class epoll_server
 {
@@ -21,14 +27,11 @@ public:
 
     bool fd_fcntl(int fd);
 
-    //void start_epoll_ET();
-    //void start_epoll_LT();
-
-    bool epoll_EPOLLIN_ADD_events_ET(int server_socket);
-    bool epoll_EPOLLERR_EPOLLHUP_DEL_events(int client_socket);
-    bool epoll_EPOLLIN_read_client(int client_socket);
-    bool epoll_EPOLLIN_read_write_client(int client_socket);
-    void epoll_events_if(epoll_event &ep_ev);
+    bool epoll_EPOLLIN_ADD_events_ET(int server_socket);    //添加一个socket连接
+    bool epoll_EPOLLERR_EPOLLHUP_DEL_events(int client_socket);     //删除一个socket连接
+    //bool epoll_EPOLLIN_read_client(int client_socket);
+    bool epoll_EPOLLIN_read_write_client(int client_socket);    //对一个socket连接作读取和写入数据的操作
+    void epoll_events_if(epoll_event &ep_ev);       //判断一个socket连接是应该被添加到队列还是应该对他发出的数据做回应
 
     void start_epoll_ET();
     
@@ -41,6 +44,10 @@ private:
     socklen_t server_sockaddr_len;
     int server_epoll;
     epoll_event server_epoll_ev[1024];
+
+    map<int, sockaddr_in> client_addr_s;
+
+    sql_pool* http_log;
 };
 
 epoll_server::epoll_server()
@@ -50,6 +57,8 @@ epoll_server::epoll_server()
 
 epoll_server::epoll_server(char* ip, uint16_t prot)
 {
+    http_log = new sql_pool("http_log.db", 10);
+
     server_socket = {0};
     server_sockaddr = {0};
     IP = inet_addr(ip);
@@ -81,6 +90,7 @@ epoll_server::epoll_server(char* ip, uint16_t prot)
 
 epoll_server::~epoll_server()
 {
+    //delete(http_log);
     close(server_socket);
     //close(server_epoll);
 }
@@ -195,7 +205,12 @@ bool epoll_server::epoll_EPOLLIN_ADD_events_ET(int server_socket)
     if (fd_fcntl(tmp_client_socket))
     {
         epoll_ctl(server_epoll, EPOLL_CTL_ADD, tmp_client_socket, &tmp_server_epoll_ev);
-        printf("客戶端标识\t%d\nIP: %s:%d\t链接上服务器\n\n", tmp_client_socket, inet_ntoa(tmp_client_sockaddr.sin_addr) , ntohs(tmp_client_sockaddr.sin_port));
+        //printf("客戶端标识\t%d\nIP: %s:%d\t链接上服务器\n\n", tmp_client_socket, inet_ntoa(tmp_client_sockaddr.sin_addr) , ntohs(tmp_client_sockaddr.sin_port));
+        //http_log->run_sql_add();
+        client_addr_s.insert(std::pair<int, sockaddr_in>(tmp_client_socket, tmp_client_sockaddr));
+        string tmp_run_sql_add_str;
+        SQL_insert_str(tmp_run_sql_add_str, tmp_client_sockaddr, "和服务器建立连接");
+        http_log->run_sql_add(tmp_run_sql_add_str);
         return true;
     }
     else
@@ -206,13 +221,20 @@ bool epoll_server::epoll_EPOLLERR_EPOLLHUP_DEL_events(int client_socket)
 {
     if (epoll_ctl(server_epoll, EPOLL_CTL_DEL, client_socket, nullptr) == 0)
     {
-        close(client_socket);
+        //http_log->run_sql_add(SQL_insert_str(client_addr_s[client_socket], "和服务器断开连接"));
+        //client_addr_s.erase(client_socket);
+        string tmp_run_sql_add_str;
+        SQL_insert_str(tmp_run_sql_add_str, client_addr_s[client_socket], "和服务器断开连接");
+        http_log->run_sql_add(tmp_run_sql_add_str);
+        client_addr_s.erase(client_socket);
+        close(client_socket); 
         printf("客戶端标识\t%d\t和服务器断开连接\n\n", client_socket);
         return true;
     }
     return false;
 }
 
+/*
 bool epoll_server::epoll_EPOLLIN_read_client(int client_socket)
 {
     char tmp_ctr[3072] = {0};
@@ -234,6 +256,7 @@ bool epoll_server::epoll_EPOLLIN_read_client(int client_socket)
         return true;
     }   
 }
+*/
 
 bool epoll_server::epoll_EPOLLIN_read_write_client(int client_socket)
 {
@@ -252,7 +275,6 @@ bool epoll_server::epoll_EPOLLIN_read_write_client(int client_socket)
             tmp_ctr_size = read(client_socket, tmp_ctr, 3072);
             //printf(tmp_ctr);
         }
-
         //printf("\n\n");
         //char* tmp_write_1 = new char[81];
         //strcpy(tmp_write_1, "HTTP/1.1 200\nserver:simple web server\nConten-length:2048\nContent-type:text/html\n");
@@ -268,6 +290,7 @@ bool epoll_server::epoll_EPOLLIN_read_write_client(int client_socket)
         http_header* header = new http_header(tmp_ctr, tmp_ctr_size);
         write(client_socket, header->get_http_server_header(), header->get_http_server_header_size());
         write(client_socket, header->get_http_request_path_file(), header->get_http_request_path_file_size());
+        sockaddr_in tmp_cilent_addr = client_addr_s[client_socket];
         delete(header);
 
         return epoll_EPOLLERR_EPOLLHUP_DEL_events(client_socket);
@@ -304,5 +327,26 @@ void epoll_server::start_epoll_ET()
     }
 }
 
+
+
+const char* SQL_insert_str(string &tmp_run_sql_add_str,sockaddr_in& tmp_client_addr, const char* event_str)
+{
+    //string client_ip = "128.0.0.9";
+    time_t tmp_time = time(0);
+    tmp_run_sql_add_str = ("INSERT INTO http_log (event, time_date, client_IP_PORT) VALUES ('");
+    tmp_run_sql_add_str += event_str;
+    tmp_run_sql_add_str += "', '";
+    tmp_run_sql_add_str += ctime(&tmp_time);
+    tmp_run_sql_add_str.pop_back();
+    tmp_run_sql_add_str += "', '";
+    tmp_run_sql_add_str += inet_ntoa(tmp_client_addr.sin_addr);
+    tmp_run_sql_add_str += ":";
+    tmp_run_sql_add_str += std::to_string(ntohs(tmp_client_addr.sin_port));
+    tmp_run_sql_add_str += "');";
+
+    cout << tmp_run_sql_add_str;
+
+    return tmp_run_sql_add_str.c_str();
+}
 
 #endif _epoll_server_

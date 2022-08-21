@@ -26,9 +26,6 @@ public:
 private:
     int client_header_size;
 
-    string client_addr;
-    int client_addr_size;
-
     string http_request;
     int http_request_size;
 
@@ -62,7 +59,7 @@ http_header::http_header(char* c_str, int tmp_client_header_size)
 {
     client_header_size = tmp_client_header_size;
     HTTP_version_and_status = "HTTP/1.1 200";
-    HTTP_server = "server:simple web server";
+    HTTP_server = "server:epoll web server";
     /*
     cout << endl << endl << endl;
     cout << http_request_filter(c_str) << endl
@@ -94,13 +91,13 @@ const char* http_header::http_request_filter(char* c_str)
 {
     if (c_str[0] == 'G' || c_str[0] == 'g')
     {
-        http_request = "GET";
-        http_request_size = http_request.size();
+        this->http_request = {"GET"};
+        this->http_request_size = http_request.size();
     }
     else if(c_str[0] == 'P' || c_str[0] == 'p')
     {
-        http_request = "POST";
-        http_request_size = http_request.size();
+        this->http_request = {"POST"};
+        this->http_request_size = http_request.size();
     }
 
     return http_request.c_str();
@@ -189,7 +186,15 @@ long http_header::get_http_request_path_file_size()
 
 const char* http_header::http_server_header_new()
 {
-    server_header = HTTP_version_and_status + '\n' +HTTP_server + '\n' + "Conten-length:" + HTTP_CL + '\n' + "Content-Type:" + http_request_path_file_type + "\n\n";
+    server_header = HTTP_version_and_status;
+    server_header += '\n' +HTTP_server;
+    server_header += '\n';
+    server_header += "Conten-length:";
+    server_header += HTTP_CL;
+    server_header += '\n';
+    server_header += "Content-Type:";
+    server_header += http_request_path_file_type;
+    server_header += "\n\n";
     server_header_size = server_header.size();
 
     return server_header.c_str();

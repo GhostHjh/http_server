@@ -13,13 +13,16 @@ using std::vector;
 using std::cout;
 using std::endl;
 
+
 class sql_pool
 {
 public:
     sql_pool(const char* db, int sql_pool);
     ~sql_pool();
 
-    void tmp_sqlite_run_sql(string SQL_str);
+    bool sqlite_db_init();
+    //void tmp_sqlite_run_sql(string SQL_str);
+    void sql_run_SQL(const char* SQL_str);
     void sql_run_SQL(string &SQL_str);
     static void* sql_pthread_run_SQL(void* args);
 
@@ -32,6 +35,7 @@ private:
     sqlite3* sqlite_pool = nullptr;
     string sqlite_db;
 
+private:
     bool sql_pool_status;
     int sql_pool_size;
     vector<string> run_sql_s;
@@ -49,9 +53,12 @@ sql_pool::sql_pool(const char* db, int pool) : sqlite_db(db), sql_pool_size(pool
         exit(0);
 
     sqlite3_config(SQLITE_CONFIG_SERIALIZED);
+
+    if(sqlite_db_init() == false)
+        exit(0);
     
     sql_pool_status = true;
-    printf("\n%d\n", sqlite3_threadsafe());
+    //printf("\n%d\n", sqlite3_threadsafe());
 
     pthread_mutex_init(&sql_run_str_mutex, 0);
     pthread_cond_init(&sql_run_str_cond, 0);
@@ -63,6 +70,7 @@ sql_pool::sql_pool(const char* db, int pool) : sqlite_db(db), sql_pool_size(pool
         sql_run_pool.push_back(new pthread_t(0));
         pthread_create(sql_run_pool[i], nullptr, &sql_pthread_run_SQL, (void*)this);
     }
+
 
     sleep(1);
 
@@ -80,10 +88,35 @@ sql_pool::~sql_pool()
     printf("\n线程结束\n");
 }
 
+bool sql_pool::sqlite_db_init()
+{
+    sqlite3_stmt* sqlite_stmt = nullptr;
+    if (sqlite3_prepare_v2(sqlite_pool, "SELECT count(*) FROM sqlite_master WHERE type='table' AND name = 'http_log'", -1, &sqlite_stmt, nullptr) == SQLITE_OK && sqlite3_step(sqlite_stmt) == SQLITE_ROW)
+    {
+        int sqlite_init = sqlite3_column_int(sqlite_stmt, 0);
+        if(sqlite_init == 0)
+        {
+            if (sqlite3_prepare_v2(sqlite_pool, "CREATE TABLE 'http_log' ( ID INTEGER PRIMARY KEY NOT NULL, time_date text NOT NULL, event text NOT NULL, client_IP_PORT text)", -1, &sqlite_stmt, nullptr) == SQLITE_OK && sqlite3_step(sqlite_stmt) == SQLITE_DONE)
+                printf("\n数据库初始化完成\n");            
+        }
+        else if (sqlite_init == 1)
+        {
+            printf("\n数据库已经初始化\n");
+        }
+        
+        sqlite3_finalize(sqlite_stmt);
+        return true;
+    }
+
+    printf("\n数据库初始化失败\n");
+    return false;
+}
+
+/*
 void sql_pool::tmp_sqlite_run_sql(string void_tmp)
 {
     sqlite3_stmt* sqlite_stmt = nullptr;
-    if (sqlite3_prepare_v2(sqlite_pool, void_tmp.c_str(), -1, &sqlite_stmt, nullptr) == SQLITE_OK && sqlite3_step(sqlite_stmt) == SQLITE_OK)
+    if (sqlite3_prepare_v2(sqlite_pool, void_tmp.c_str(), -1, &sqlite_stmt, nullptr) == SQLITE_OK && sqlite3_step(sqlite_stmt) == SQLITE_ROW)
     {
         sqlite3_finalize(sqlite_stmt);
     }
@@ -92,21 +125,26 @@ void sql_pool::tmp_sqlite_run_sql(string void_tmp)
         exit(0);
     }     
 }
+*/
 
-void sql_pool::sql_run_SQL(string &SQL_str)
+void sql_pool::sql_run_SQL(const char* SQL_str)
 {
     //pthread_mutex_lock(&sql_run_mutex);
     sqlite3_stmt* sqlite_stmt = nullptr;
-    if (sqlite3_prepare_v2(sqlite_pool, SQL_str.c_str(), -1, &sqlite_stmt, nullptr) == SQLITE_OK && sqlite3_step(sqlite_stmt) == SQLITE_OK)
+    if (sqlite3_prepare_v2(sqlite_pool, SQL_str, -1, &sqlite_stmt, nullptr) == SQLITE_OK  && sqlite3_step(sqlite_stmt) == SQLITE_DONE)
     {
         sqlite3_finalize(sqlite_stmt);
     }
-    /*else
+    else
     {
-        printf("sql数据库写入出错");
-    }*/
+        printf("\nsql数据库写入出错\n");
+    }
     //pthread_mutex_unlock(&sql_run_mutex);
+}
 
+void sql_pool::sql_run_SQL(string &SQL_str)
+{
+    sql_run_SQL(SQL_str.c_str());
 }
 
 void* sql_pool::sql_pthread_run_SQL(void* args)
@@ -120,7 +158,8 @@ void* sql_pool::sql_pthread_run_SQL(void* args)
             pthread_cond_wait(&(this_sql_pool->sql_run_str_cond), &(this_sql_pool->sql_run_str_mutex));
         }
 
-        string tmp_run_sql = this_sql_pool->run_sql_s.back();
+        string tmp_run_sql(this_sql_pool->run_sql_s.back());
+        //cout << tmp_run_sql;
         this_sql_pool->run_sql_s.pop_back();
         pthread_mutex_unlock(&(this_sql_pool->sql_run_str_mutex));
 
