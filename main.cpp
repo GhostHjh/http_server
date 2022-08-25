@@ -1,6 +1,6 @@
 #include <iostream>
 #include <string>
-#include "include/sql_pool.hpp"
+//#include "include/sql_pool.hpp"
 #include <ctime>
 #include "include/epoll_server.hpp"
 //#include "http_header.hpp"
@@ -42,7 +42,7 @@ int main(int argc, char** argv)
     */
     
     
-    sleep(200);
+    sleep(2);
 
     return 0;
 }
