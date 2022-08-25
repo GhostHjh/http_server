@@ -13,7 +13,6 @@
 
 #include "http_header.hpp"
 #include "sql_pool.hpp"
-//#include "pthread_pool.hpp"
 
 using std::map;
 const char* SQL_insert_str(string&, sockaddr_in&, const char*);

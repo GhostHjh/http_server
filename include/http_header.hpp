@@ -1,7 +1,6 @@
 #ifndef _http_header_
 #define _http_header_
 #include <iostream>
-//#include <stdio.h>
 #include <string>
 #include <sstream>
 #include <fstream>

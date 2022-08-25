@@ -6,7 +6,6 @@
 #include <vector>
 #include <pthread.h>
 #include "include/sqlite3.h"
-//#include "../pthread_pool.hpp"
 
 using std::string;
 using std::vector;
