@@ -274,21 +274,12 @@ bool epoll_server::epoll_EPOLLIN_read_write_client(int client_socket)
             tmp_ctr_size = read(client_socket, tmp_ctr, 3072);
             //printf(tmp_ctr);
         }
-        //printf("\n\n");
-        //char* tmp_write_1 = new char[81];
-        //strcpy(tmp_write_1, "HTTP/1.1 200\nserver:simple web server\nConten-length:2048\nContent-type:text/html\n");
-        //write(client_socket, tmp_write_1, 81);
-        //cout << tmp_write_1 << endl;
-        //char* tmp_write_2 = new char[122];
-        //strcpy(tmp_write_2, "<!DOCTYPE html>\n<html>\n<head>\n<meta charset=\"utf-8\">\n<title>test</title>\n</head>\n<body>\n    Hello World.\n</body>\n</html>\n");
-        //write(client_socket, tmp_write_2, 122);
-        //cout << tmp_write_2 << endl;
-        //delete[](tmp_write_1);
-        //delete[](tmp_write_2);
-
+        
         http_header* header = new http_header(tmp_ctr, tmp_ctr_size);
-        write(client_socket, header->get_http_server_header(), header->get_http_server_header_size());
-        write(client_socket, header->get_http_request_path_file(), header->get_http_request_path_file_size());
+        write(client_socket, header->get_s_header(), header->get_s_header_size());
+        //cout << header->get_s_header() << endl;
+        write(client_socket, header->get_c_header_file(), header->get_c_header_file_size());
+        //cout << header->get_c_header_file() << endl;
         sockaddr_in tmp_cilent_addr = client_addr_s[client_socket];
         delete(header);
 
@@ -325,8 +316,6 @@ void epoll_server::start_epoll_ET()
         }
     }
 }
-
-
 
 const char* SQL_insert_str(string &tmp_run_sql_add_str,sockaddr_in& tmp_client_addr, const char* event_str)
 {
