@@ -14,22 +14,25 @@ class http_header
 {
 public:
     http_header(char* header_cstr, int tmp_header_size);
+    http_header(char* header_cstr, int tmp_header_size, const char* www_path);
     http_header();
     ~http_header();
 
 //client header
 private:
-    int header_size;
+    int header_size;                //接收的header的大小
+    string path_file_name;          //设置的网页文件路径
+    int i_ptr;                      //第一行的大小
 
-    string c_header_request;
-    string c_header_path;
-    string c_header_HTTP_version;
-    string c_header_Host;
-    string c_header_User_Agent;
-    string c_header_Accept;
+    string c_header_request;        //请求方式
+    string c_header_path;           //请求文件路径
+    string c_header_HTTP_version;   //HTTP版本
+    string c_header_Host;           //Host路径
+    string c_header_User_Agent;     //User-Agent
+    string c_header_Accept;         //文件类型
 
-    char* c_header_file;
-    long c_header_file_size;
+    char* c_header_file;            //被请求文件的内容
+    long c_header_file_size;        //被请求文件内容的大小
 
 private:
     const char* set_c_header_request(char*);
@@ -65,18 +68,47 @@ public:
     const int get_s_header_size() { return s_header.size(); }
 };
 
-http_header::http_header(char* c_str, int tmp_header_size) : header_size(tmp_header_size)
+http_header::http_header(char* header_cstr, int tmp_header_size) : header_size(tmp_header_size)
 {
-    set_c_header_request(c_str);
-    set_c_header_path(c_str);
-    set_c_header_HTTP_version(c_str);
-    set_c_header_Host(c_str);
-    set_c_header_Accept(c_str);
-    set_c_header_User_Agent(c_str);
+    set_c_header_request(header_cstr);
+    set_c_header_path(header_cstr);
+    set_c_header_HTTP_version(header_cstr);
+    set_c_header_Host(header_cstr);
+    set_c_header_Accept(header_cstr);
+    set_c_header_User_Agent(header_cstr);
     set_c_header_file(c_header_path.c_str());
 
     set_s_header_main();
     set_s_header_control_type_charset();
+}
+
+http_header::http_header(char* header_cstr, int tmp_header_size, const char* www_path) : header_size(tmp_header_size)
+{
+    path_file_name = www_path;
+    if(path_file_name.size() >= 1 && path_file_name[path_file_name.size() -1] == '/')
+        path_file_name.pop_back();
+
+
+    /*
+    cout << set_c_header_request(header_cstr) << endl
+        << set_c_header_path(header_cstr) << endl
+        << set_c_header_HTTP_version(header_cstr) << endl
+        << set_c_header_Host(header_cstr) << endl
+        << set_c_header_Accept(header_cstr) << endl
+        << set_c_header_User_Agent(header_cstr) << endl
+        << set_c_header_file(c_header_path.c_str()) << endl
+        << set_s_header_main() << endl
+        << set_s_header_control_type_charset() << endl;
+    */
+    set_c_header_request(header_cstr);
+    set_c_header_path(header_cstr);
+    set_c_header_HTTP_version(header_cstr);
+    set_c_header_Host(header_cstr);
+    set_c_header_Accept(header_cstr);
+    set_c_header_User_Agent(header_cstr);
+    set_c_header_file(c_header_path.c_str());
+    set_s_header_main();
+    set_s_header_control_type_charset();;
 }
 
 http_header::http_header()
@@ -94,9 +126,11 @@ http_header::~http_header()
 const char* http_header::set_c_header_request(char* header)
 {
     if (header[0] == 'G')
-        c_header_request += "set";
+        c_header_request += "GET";
     else if (header[0] == 'P')
         c_header_request += "POST";
+
+    i_ptr = c_header_request.size() +1;
 
     return c_header_request.c_str();
 }
@@ -104,14 +138,12 @@ const char* http_header::set_c_header_request(char* header)
 //提取请求文件路径
 const char* http_header::set_c_header_path(char* header)
 {
-    c_header_path.push_back('.');
-    for (int i = c_header_request.size() +1; header[i] != ' ' && header[i] != '\n' && header[i] != '\r'; ++i)
+    for (i_ptr; header[i_ptr] != ' ' && header[i_ptr] != '\n' && header[i_ptr] != '\r'; ++i_ptr)
     {
-        c_header_path.push_back(header[i]);
+        c_header_path.push_back(header[i_ptr]);
     }
 
-    if (c_header_path == "./")
-        c_header_path += "index.html";
+    ++i_ptr;
 
     return c_header_path.c_str();
 }
@@ -119,16 +151,20 @@ const char* http_header::set_c_header_path(char* header)
 //提前HTTP协议
 const char* http_header::set_c_header_HTTP_version(char* header)
 {
-    for (int i = 0; i < header_size && header[i] != '\n' && header[i] != '\r'; ++i)
+    if (header[i_ptr +8] == '\n' || header[i_ptr +8] == '\r')
     {
-        if (header[i +8] == '\n' || header[i +8] == '\r')
-        {
-            for (int o = 0; o < 8; ++o)
-                c_header_HTTP_version.push_back(header[i+o]);
-
-            i +=7;
-        }
+        for (int o = 0; o < 8; ++o)
+            c_header_HTTP_version.push_back(header[i_ptr+o]);
+        
+        i_ptr += c_header_HTTP_version.size() +1;
     }
+    else
+    {
+        c_header_HTTP_version = "HTTP/1.0";
+        i_ptr += 9;
+    }
+        
+    
 
     return c_header_HTTP_version.c_str();
 }
@@ -136,7 +172,7 @@ const char* http_header::set_c_header_HTTP_version(char* header)
 //提取Host
 const char* http_header::set_c_header_Host(char* header)
 {
-    for (int i = 0; i < header_size; ++i)
+    for (int i = i_ptr; i < header_size; ++i)
     {
         if (header[i] == 'H' && header[i +1] == 'o' && header[i +2] == 's' && header[i +3] == 't')
         {
@@ -156,7 +192,7 @@ const char* http_header::set_c_header_Host(char* header)
 //提取User-Agent
 const char* http_header::set_c_header_User_Agent(char* header)
 {
-    for (int i = 0; i < header_size; ++i)
+    for (int i = i_ptr; i < header_size; ++i)
     {
         if (header[i] == 'U' && header[i +1] == 's' && header[i +2] == 'e' && header[i +3] == 'r' && header[i +4] == '-' && header[i +5] == 'A' && header[i +6] == 'g' && header[i +7] == 'e' && header[i +8] == 'n' && header[i +9] == 't')
         {
@@ -176,7 +212,7 @@ const char* http_header::set_c_header_User_Agent(char* header)
 //提取文件格式
 const char* http_header::set_c_header_Accept(char* header)
 {
-    for (int i = 0; i < header_size; ++i)
+    for (int i = i_ptr; i < header_size; ++i)
     {
         if (header[i] == 'A' && header[i +1] == 'c' && header[i +2] == 'c' && header[i +3] == 'e' && header[i +4] == 'p' && header[i +5] == 't')
         {
@@ -196,12 +232,21 @@ const char* http_header::set_c_header_Accept(char* header)
 //提取文件内容
 const char* http_header::set_c_header_file(const char* file_name)
 {
+    if(c_header_path == "/")
+        c_header_path += "index.html";
+
+    if(path_file_name.size() <= 1)
+        path_file_name = ".";
+
+    path_file_name += c_header_path;
+
+
     FILE* file = nullptr;
 
     if (c_header_Accept == "text/html" || c_header_Accept == "text/css" || c_header_Accept == "application/x-javascript")
-        file = fopen(c_header_path.c_str(), "r");
+        file = fopen(path_file_name.c_str(), "r");
     else
-        file = fopen(c_header_path.c_str(), "rb");
+        file = fopen(path_file_name.c_str(), "rb");
 
 
     if (file != nullptr)
